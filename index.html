@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ledger — Billing</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink:       #0e0d0b;
+    --paper:     #f5f0e8;
+    --cream:     #ede8de;
+    --warm:      #d4c9b2;
+    --accent:    #c8502a;
+    --accent2:   #2a6b4f;
+    --gold:      #b8860b;
+    --muted:     #6b6458;
+    --line:      rgba(14,13,11,0.12);
+    --serif:     'DM Serif Display', Georgia, serif;
+    --mono:      'DM Mono', 'Courier New', monospace;
+    --sans:      'Instrument Sans', sans-serif;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Noise texture overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 999;
+    opacity: 0.5;
+  }
+
+  /* ─── HEADER ─── */
+  header {
+    border-bottom: 1px solid var(--line);
+    padding: 20px 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: var(--paper);
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: var(--serif);
+    font-size: 1.6rem;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .logo-mark {
+    width: 32px; height: 32px;
+    background: var(--ink);
+    border-radius: 50%;
+    display: grid; place-items: center;
+    flex-shrink: 0;
+  }
+  .logo-mark svg { width: 16px; height: 16px; }
+
+  .header-meta {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--muted);
+    text-align: right;
+    line-height: 1.6;
+  }
+
+  /* ─── MAIN LAYOUT ─── */
+  main {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 48px 80px;
+  }
+
+  /* ─── HERO STATS ─── */
+  .stats-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    margin: 40px 0 0;
+  }
+
+  .stat-cell {
+    background: var(--paper);
+    padding: 28px 32px;
+    position: relative;
+    overflow: hidden;
+    transition: background 0.2s;
+  }
+  .stat-cell:hover { background: var(--cream); }
+  .stat-cell.featured { background: var(--ink); color: var(--paper); }
+  .stat-cell.featured:hover { background: #1e1c18; }
+
+  .stat-label {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    opacity: 0.5;
+    margin-bottom: 10px;
+  }
+  .stat-value {
+    font-family: var(--serif);
+    font-size: 2.4rem;
+    line-height: 1;
+    letter-spacing: -0.03em;
+  }
+  .stat-value.big { font-size: 3rem; }
+  .stat-sub {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    opacity: 0.45;
+    margin-top: 6px;
+  }
+
+  .stat-accent {
+    position: absolute;
+    bottom: 16px; right: 20px;
+    font-size: 3rem;
+    opacity: 0.06;
+    font-family: var(--serif);
+    line-height: 1;
+  }
+
+  /* ─── SECTION TITLE ─── */
+  .section-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin: 48px 0 0;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  .section-title {
+    font-family: var(--serif);
+    font-size: 1.4rem;
+    font-style: italic;
+  }
+  .section-count {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--muted);
+  }
+
+  /* ─── ADD INVOICE FORM ─── */
+  .form-strip {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 140px 40px;
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    margin-top: 1px;
+  }
+
+  .form-field {
+    background: var(--cream);
+    position: relative;
+  }
+  .form-field label {
+    display: block;
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 10px 16px 0;
+  }
+  .form-field input {
+    width: 100%;
+    background: none;
+    border: none;
+    outline: none;
+    font-family: var(--sans);
+    font-size: 0.9rem;
+    color: var(--ink);
+    padding: 6px 16px 12px;
+  }
+  .form-field input::placeholder { color: var(--warm); }
+
+  .form-submit {
+    background: var(--ink);
+    border: none;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    color: var(--paper);
+    transition: background 0.2s;
+    font-size: 1.2rem;
+  }
+  .form-submit:hover { background: var(--accent); }
+  .form-submit:active { transform: scale(0.96); }
+
+  /* ─── FILTER BAR ─── */
+  .filter-bar {
+    display: flex;
+    gap: 4px;
+    margin-top: 20px;
+    margin-bottom: 0;
+  }
+  .filter-btn {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border: 1px solid var(--line);
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .filter-btn:hover, .filter-btn.active {
+    background: var(--ink);
+    color: var(--paper);
+    border-color: var(--ink);
+  }
+
+  /* ─── INVOICE LIST ─── */
+  .invoice-list { margin-top: 1px; }
+
+  .invoice-header {
+    display: grid;
+    grid-template-columns: 80px 1fr 1fr 120px 100px 40px;
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    margin-top: 12px;
+  }
+  .inv-hcell {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 10px 16px;
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    opacity: 0.85;
+  }
+
+  .invoice-row {
+    display: grid;
+    grid-template-columns: 80px 1fr 1fr 120px 100px 40px;
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-top: none;
+    animation: rowIn 0.35s cubic-bezier(0.16,1,0.3,1) both;
+  }
+  @keyframes rowIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .inv-cell {
+    background: var(--paper);
+    padding: 14px 16px;
+    font-size: 0.85rem;
+    transition: background 0.15s;
+    display: flex;
+    align-items: center;
+  }
+  .invoice-row:hover .inv-cell { background: var(--cream); }
+
+  .inv-id {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--muted);
+  }
+  .inv-client { font-weight: 600; letter-spacing: -0.01em; }
+  .inv-desc { color: var(--muted); font-size: 0.8rem; }
+  .inv-amount {
+    font-family: var(--mono);
+    font-size: 0.95rem;
+    font-weight: 500;
+  }
+
+  .status-badge {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 2px;
+    font-weight: 500;
+  }
+  .status-paid {
+    background: #e6f4ee;
+    color: var(--accent2);
+    border: 1px solid #b8ddc9;
+  }
+  .status-unpaid {
+    background: #fdf0ec;
+    color: var(--accent);
+    border: 1px solid #f0c4b4;
+  }
+  .status-overdue {
+    background: #fff8e8;
+    color: var(--gold);
+    border: 1px solid #e8d498;
+  }
+
+  .pay-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+    display: grid;
+    place-items: center;
+    color: var(--muted);
+    font-size: 0.75rem;
+    transition: all 0.15s;
+    background: var(--paper);
+  }
+  .pay-btn:hover { background: var(--accent2); color: white; }
+  .pay-btn.paid { color: var(--warm); cursor: default; }
+  .pay-btn.paid:hover { background: var(--paper); color: var(--warm); }
+
+  /* ─── EMPTY STATE ─── */
+  .empty-state {
+    border: 1px solid var(--line);
+    border-top: none;
+    padding: 64px 32px;
+    text-align: center;
+    background: var(--paper);
+  }
+  .empty-state-glyph {
+    font-family: var(--serif);
+    font-size: 4rem;
+    font-style: italic;
+    opacity: 0.1;
+    margin-bottom: 16px;
+    display: block;
+  }
+  .empty-state p {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  /* ─── TOAST ─── */
+  .toast {
+    position: fixed;
+    bottom: 32px;
+    right: 32px;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    padding: 12px 20px;
+    border-radius: 2px;
+    opacity: 0;
+    transform: translateY(12px);
+    transition: all 0.3s cubic-bezier(0.16,1,0.3,1);
+    pointer-events: none;
+    z-index: 200;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.green { background: var(--accent2); }
+  .toast.red   { background: var(--accent); }
+
+  /* ─── EXPORT ─── */
+  .export-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 32px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    justify-content: flex-end;
+  }
+  .export-btn {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 8px 18px;
+    border: 1px solid var(--line);
+    background: none;
+    cursor: pointer;
+    color: var(--muted);
+    transition: all 0.15s;
+  }
+  .export-btn:hover { border-color: var(--ink); color: var(--ink); }
+
+  /* ─── PROJECT BADGE ─── */
+  .project-badge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+  .project-tag {
+    font-family: var(--mono);
+    font-size: 0.55rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--paper);
+    background: var(--accent);
+    padding: 3px 9px;
+    border-radius: 2px;
+    font-weight: 500;
+  }
+  .project-name {
+    font-family: var(--serif);
+    font-size: 1rem;
+    font-style: italic;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+    text-align: center;
+  }
+
+  /* ─── RESPONSIVE ─── */
+  @media (max-width: 768px) {
+    header {
+      padding: 12px 16px;
+      flex-wrap: nowrap;
+      gap: 8px;
+    }
+    .logo { font-size: 1.25rem; gap: 8px; }
+    .logo-mark { width: 28px; height: 28px; }
+
+    /* Badge: go inline, pill + name side by side, pushed to right */
+    .project-badge {
+      flex-direction: row;
+      align-items: center;
+      gap: 6px;
+      margin-left: auto;
+    }
+    .project-tag {
+      font-size: 0.5rem;
+      letter-spacing: 0.08em;
+      padding: 2px 7px;
+      white-space: nowrap;
+    }
+    .project-name {
+      font-size: 0.8rem;
+      white-space: nowrap;
+    }
+
+    /* Hide clock on mobile to free header space */
+    .header-meta { display: none; }
+
+    main   { padding: 0 16px 60px; }
+    .stats-row { grid-template-columns: 1fr 1fr; }
+    .form-strip { grid-template-columns: 1fr 1fr; }
+    .form-submit { grid-column: 1/-1; height: 48px; }
+    .invoice-header, .invoice-row { grid-template-columns: 60px 1fr 100px 80px 36px; }
+    .inv-desc-cell { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-mark">
+      <svg viewBox="0 0 16 16" fill="none">
+        <path d="M3 4h10M3 8h7M3 12h4" stroke="#f5f0e8" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </div>
+    Ledger
+  </div>
+  <div class="project-badge">
+    <span class="project-tag">OOP Mini Project</span>
+    <span class="project-name">Billing System</span>
+  </div>
+  <div class="header-meta">
+    <div id="hdr-date"></div>
+    <div id="hdr-time"></div>
+  </div>
+</header>
+
+<main>
+
+  <!-- STATS -->
+  <div class="stats-row">
+    <div class="stat-cell featured">
+      <div class="stat-label">Total Billed</div>
+      <div class="stat-value big" id="stat-total">₹0.00</div>
+      <div class="stat-sub">across all invoices</div>
+      <div class="stat-accent">₹</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-label">Outstanding</div>
+      <div class="stat-value" id="stat-unpaid" style="color:var(--accent)">0</div>
+      <div class="stat-sub" id="stat-unpaid-amt">₹0.00 pending</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-label">Collected</div>
+      <div class="stat-value" id="stat-paid" style="color:var(--accent2)">0</div>
+      <div class="stat-sub" id="stat-paid-amt">₹0.00 received</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-label">Invoices</div>
+      <div class="stat-value" id="stat-count">0</div>
+      <div class="stat-sub">total raised</div>
+    </div>
+  </div>
+
+  <!-- ADD INVOICE -->
+  <div class="section-header" style="margin-top:40px">
+    <span class="section-title">New Invoice</span>
+    <span class="section-count">Fill all fields and press +</span>
+  </div>
+
+  <div class="form-strip">
+    <div class="form-field">
+      <label>Client Name</label>
+      <input id="f-client" placeholder="Acme Corp" autocomplete="off">
+    </div>
+    <div class="form-field">
+      <label>Description</label>
+      <input id="f-desc" placeholder="Website redesign">
+    </div>
+    <div class="form-field">
+      <label>Due Date</label>
+      <input id="f-due" type="date">
+    </div>
+    <div class="form-field">
+      <label>Amount (₹)</label>
+      <input id="f-amount" type="number" placeholder="5000" min="0" step="0.01">
+    </div>
+    <button class="form-submit" onclick="addInvoice()" title="Add invoice">+</button>
+  </div>
+
+  <!-- INVOICES LIST -->
+  <div class="section-header" style="margin-top:40px">
+    <span class="section-title">All Invoices</span>
+    <span class="section-count" id="list-count">0 entries</span>
+  </div>
+
+  <div class="filter-bar">
+    <button class="filter-btn active" onclick="setFilter('all', this)">All</button>
+    <button class="filter-btn" onclick="setFilter('unpaid', this)">Unpaid</button>
+    <button class="filter-btn" onclick="setFilter('paid', this)">Paid</button>
+    <button class="filter-btn" onclick="setFilter('overdue', this)">Overdue</button>
+  </div>
+
+  <div>
+    <div class="invoice-header">
+      <div class="inv-hcell">No.</div>
+      <div class="inv-hcell">Client</div>
+      <div class="inv-hcell inv-desc-cell">Description</div>
+      <div class="inv-hcell">Amount</div>
+      <div class="inv-hcell">Status</div>
+      <div class="inv-hcell" style="opacity:0.3">✓</div>
+    </div>
+    <div class="invoice-list" id="invoice-list"></div>
+  </div>
+
+  <!-- EXPORT -->
+  <div class="export-row">
+    <button class="export-btn" onclick="exportCSV()">↓ Export CSV</button>
+    <button class="export-btn" onclick="window.print()">↓ Print</button>
+  </div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ─── STATE ───
+  let invoices = JSON.parse(localStorage.getItem('ledger_invoices') || '[]');
+  let filter = 'all';
+  let nextId = invoices.length ? Math.max(...invoices.map(i => i.id)) + 1 : 1001;
+
+  // ─── CLOCK ───
+  function tick() {
+    const now = new Date();
+    document.getElementById('hdr-date').textContent =
+      now.toLocaleDateString('en-IN', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+    document.getElementById('hdr-time').textContent =
+      now.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  }
+  tick(); setInterval(tick, 1000);
+
+  // ─── SET DUE DATE DEFAULT ───
+  const today = new Date();
+  const nextMonth = new Date(today); nextMonth.setDate(today.getDate() + 30);
+  document.getElementById('f-due').value = nextMonth.toISOString().split('T')[0];
+
+  // ─── ADD INVOICE ───
+  function addInvoice() {
+    const client = document.getElementById('f-client').value.trim();
+    const desc   = document.getElementById('f-desc').value.trim();
+    const due    = document.getElementById('f-due').value;
+    const amount = parseFloat(document.getElementById('f-amount').value);
+
+    if (!client)         return toast('Client name is required', 'red');
+    if (!amount || amount <= 0) return toast('Enter a valid amount', 'red');
+
+    const inv = { id: nextId++, client, desc, due, amount, status: 'unpaid', created: Date.now() };
+    invoices.unshift(inv);
+    save(); render();
+
+    // clear fields
+    document.getElementById('f-client').value = '';
+    document.getElementById('f-desc').value   = '';
+    document.getElementById('f-amount').value = '';
+
+    toast(`Invoice #${inv.id} created`, 'green');
+  }
+
+  // ─── PAY INVOICE ───
+  function markPaid(id) {
+    const inv = invoices.find(i => i.id === id);
+    if (!inv || inv.status === 'paid') return;
+    inv.status = 'paid';
+    inv.paidAt = Date.now();
+    save(); render();
+    toast(`Invoice #${id} marked as paid`, 'green');
+  }
+
+  // ─── COMPUTE STATUS ───
+  function computeStatus(inv) {
+    if (inv.status === 'paid') return 'paid';
+    if (inv.due && new Date(inv.due) < new Date()) return 'overdue';
+    return 'unpaid';
+  }
+
+  // ─── RENDER ───
+  function render() {
+    const list = document.getElementById('invoice-list');
+
+    let visible = invoices.filter(inv => {
+      const s = computeStatus(inv);
+      if (filter === 'all') return true;
+      return s === filter;
+    });
+
+    // stats (always all invoices)
+    let total = 0, paidAmt = 0, unpaidAmt = 0, paidCount = 0, unpaidCount = 0;
+    invoices.forEach(inv => {
+      total += inv.amount;
+      if (inv.status === 'paid') { paidAmt += inv.amount; paidCount++; }
+      else { unpaidAmt += inv.amount; unpaidCount++; }
+    });
+
+    document.getElementById('stat-total').textContent    = fmt(total);
+    document.getElementById('stat-paid').textContent     = paidCount;
+    document.getElementById('stat-paid-amt').textContent = fmt(paidAmt) + ' received';
+    document.getElementById('stat-unpaid').textContent     = unpaidCount;
+    document.getElementById('stat-unpaid-amt').textContent = fmt(unpaidAmt) + ' pending';
+    document.getElementById('stat-count').textContent    = invoices.length;
+    document.getElementById('list-count').textContent    = visible.length + ' entr' + (visible.length === 1 ? 'y' : 'ies');
+
+    if (!visible.length) {
+      list.innerHTML = `<div class="empty-state">
+        <span class="empty-state-glyph">∅</span>
+        <p>No invoices here yet</p>
+      </div>`;
+      return;
+    }
+
+    list.innerHTML = visible.map((inv, i) => {
+      const s = computeStatus(inv);
+      const badgeClass = `status-${s}`;
+      const label = s === 'paid' ? 'Paid' : s === 'overdue' ? 'Overdue' : 'Unpaid';
+      const payIcon = s === 'paid' ? '✓' : '→';
+      const payClass = s === 'paid' ? 'paid' : '';
+      const dueStr = inv.due ? new Date(inv.due).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'2-digit'}) : '—';
+      return `<div class="invoice-row" style="animation-delay:${i * 30}ms">
+        <div class="inv-cell inv-id">#${inv.id}</div>
+        <div class="inv-cell">
+          <div>
+            <div class="inv-client">${esc(inv.client)}</div>
+            <div style="font-family:var(--mono);font-size:0.6rem;color:var(--muted);margin-top:2px">Due ${dueStr}</div>
+          </div>
+        </div>
+        <div class="inv-cell inv-desc inv-desc-cell">${esc(inv.desc) || '—'}</div>
+        <div class="inv-cell inv-amount">${fmt(inv.amount)}</div>
+        <div class="inv-cell"><span class="status-badge ${badgeClass}">${label}</span></div>
+        <div class="inv-cell" style="padding:0">
+          <button class="pay-btn ${payClass}" onclick="${s !== 'paid' ? `markPaid(${inv.id})` : ''}"
+            title="${s !== 'paid' ? 'Mark as paid' : 'Already paid'}">${payIcon}</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // ─── FILTER ───
+  function setFilter(f, btn) {
+    filter = f;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    render();
+  }
+
+  // ─── EXPORT CSV ───
+  function exportCSV() {
+    const rows = [['ID','Client','Description','Due','Amount','Status']];
+    invoices.forEach(inv => rows.push([
+      inv.id, inv.client, inv.desc, inv.due || '', inv.amount, computeStatus(inv)
+    ]));
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+    a.download = `ledger_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    toast('CSV exported');
+  }
+
+  // ─── HELPERS ───
+  function save()  { localStorage.setItem('ledger_invoices', JSON.stringify(invoices)); }
+  function fmt(n)  { return '₹' + n.toLocaleString('en-IN', { minimumFractionDigits:2, maximumFractionDigits:2 }); }
+  function esc(s)  { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  let toastTimer;
+  function toast(msg, type = '') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'toast show' + (type ? ' ' + type : '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.className = 'toast'; }, 2800);
+  }
+
+  // ─── KEYBOARD SHORTCUT: Enter to add ───
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && ['f-client','f-desc','f-due','f-amount'].includes(document.activeElement.id))
+      addInvoice();
+  });
+
+  // ─── INIT ───
+  render();
+</script>
+</body>
+</html>
